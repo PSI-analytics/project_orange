@@ -1,0 +1,25 @@
+# This is a boilerplate parameters config generated for pipeline 'model_predictions'
+# using Kedro 1.0.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.0.0/configuration/parameters.html
+commercial_simulations_params:
+  number_of_playoff_fixtures: 7
+  playoff_variables:
+    {
+      "season": "2024/2025",
+      "match_date": "2025-05-30",
+      "month": "May",
+      "day_of_week": "Saturday",
+      "week_of_month": 5,
+      "match_kick_off_time": "21:00:00",
+      "time_slot": "Saturday 21:00",
+      "home_team": "",
+      "away_team": "",
+      "derby": 0,
+      "match_jeopardy_title": 1,
+      "match_jeopardy_play_offs": 0,
+      "match_jeopardy_relegation": 0,
+      "venue_name": "King Abdullah Sport City",
+      "venue_capacity": 60348
+    }

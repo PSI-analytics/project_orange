@@ -1,0 +1,255 @@
+# This is a boilerplate parameters config generated for pipeline 'model_generation'
+# using Kedro 1.0.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.0.0/configuration/parameters.html
+# The model_options below are "base" options for all pipelines
+# kedro dyanmic pipelines can make use of YAML inheritance which makes use of anchors, aliases and merge keys
+# for more information see https://medium.com/@mbanaee61/understanding-yaml-inheritance-and-its-implementation-in-spring-boot-with-junit-tests-6b39d9474dc8
+# in summary
+# 1. anchors (&)
+# purpose: Define a reusable block of YAML content
+# syntax: &anchor_name
+# location: Placed after a key to mark that section as reusable
+# 2. aliases (*)
+# purpose: Reference and reuse content defined by an anchor
+# syntax: *anchor_name
+# effect: Copies the entire referenced block
+# 3. merge key (<<:)
+# purpose: Merge properties from another YAML block into the current block
+# syntax: <<: *anchor_name
+# effect: Inherits all properties but allows overrides
+# -------------------------------
+# model parameters
+linear_regression_model_params: &linear_base
+  # holdout dataset to filter out from model training
+  holdout_season:
+    -
+  numerical_columns:
+    - prospect_home_team_rating
+    - prospect_away_team_rating
+    - prospect_combined_squad_rating
+    - prospect_team_rating_abs_difference
+    - venue_capacity
+    - match_jeopardy_title
+    - match_jeopardy_relegation
+    - derby
+  categorical_columns:
+    - time_slot
+    - month
+    - season
+  target_variable: venue_percentage_capacity
+  # features which are not needed for model training but useful to have when evaluating the model
+  explainer_columns:
+    - season
+    - match_date
+    - time_slot
+    - home_team
+    - away_team
+    - attendance
+  standardise_data: True
+  model_name: "linear_regression_predicted_attendance_model"
+  model_type: "linear_regression"
+  random_state: 29
+  train_n_sets: 4
+  bag_n_sets: 4
+  bag_n_splits: 4
+  bag_sample_with_replacement: True
+  bag_split_size: 0.8
+  # model error metrics available on sklearn (https://scikit-learn.org/stable/modules/model_evaluation.html)
+  model_error_metrics:
+    - "r2_score"
+    - "mean_absolute_error"
+    - "explained_variance_score"
+    - "mean_squared_error"
+    - "median_absolute_error"
+  # if model training is using stacked data or not
+  stacked_data: False
+  stacked_columns:
+      -
+  show_plots: False
+
+xgboost_regression_model_params: &xgboost_base
+  # holdout dataset to filter out from model training
+  holdout_season:
+    -
+  numerical_columns:
+    - venue_percentage_capacity_linear_regression_predicted
+    - prospect_home_team_rating
+    - prospect_away_team_rating
+    - prospect_combined_squad_rating
+    - prospect_team_rating_abs_difference
+    - venue_capacity
+    - match_jeopardy_title
+    - match_jeopardy_relegation
+    - month_January
+    - month_February
+    - month_March
+    - month_April
+    - month_May
+    - month_August
+    - month_September
+    - month_October
+    - month_November
+    - month_December
+    - time_slot_Monday
+    - time_slot_Tuesday
+    - time_slot_Wednesday
+    - time_slot_Thursday 18:00
+    - time_slot_Thursday 21:00
+    - time_slot_Thursday Other
+    - time_slot_Friday 18:00
+    - time_slot_Friday 21:00
+    - time_slot_Friday Other
+    - time_slot_Saturday 18:00
+    - time_slot_Saturday 21:00
+    - time_slot_Saturday Other
+    - time_slot_Sunday
+    - derby
+    - "season_2021/2022"
+    - "season_2022/2023"
+    - "season_2023/2024"
+    - "season_2024/2025"
+  categorical_columns:
+  target_variable: venue_percentage_capacity
+  # features which are not needed for model training but useful to have when evaluating the model
+  explainer_columns:
+    - season
+    - match_date
+    - home_team
+    - away_team
+    - attendance
+    - train_id
+    - train_split
+    - train_type
+  standardise_data: False
+  model_name: "xgboost_regression_predicted_attendance_model"
+  model_type: "xgboost_regression"
+  random_state: 29
+  train_n_sets: 4
+  bag_n_sets: 4
+  bag_n_splits: 4
+  bag_sample_with_replacement: True
+  bag_split_size: 0.8
+  xgboost_cv: 1
+  xgboost_learning_rate:
+    - 0.01
+  xgboost_n_estimators:
+    - 600
+  xgboost_max_depth:
+    - 3
+  xgboost_min_child_weight:
+    - 10
+  xgboost_regression_scoring: "neg_mean_squared_error"
+  # model error metrics available on sklearn (https://scikit-learn.org/stable/modules/model_evaluation.html)
+  model_error_metrics:
+    - "r2_score"
+    - "mean_absolute_error"
+    - "explained_variance_score"
+    - "mean_squared_error"
+    - "median_absolute_error"
+  stacked_data: True
+  stacked_columns:
+    - venue_percentage_capacity_linear_regression_predicted
+  show_plots: False
+
+stacked_model:
+  attendance:
+    linear_regression_model_params:
+      <<: *linear_base
+    xgboost_regression_model_params:
+      <<: *xgboost_base
+  domestic_viewership:
+    linear_regression_model_params: &linear_viewership_base
+      <<: *linear_base
+      model_name: "linear_regression_predicted_viewership_model"
+      random_state: 28
+      train_n_sets: 3
+      bag_n_sets: 3
+      bag_n_splits: 3
+      numerical_columns:
+        - prospect_combined_team_rating
+        - prospect_combined_squad_rating
+        - prospect_team_rating_abs_difference
+        - match_jeopardy_title
+        - match_jeopardy_relegation
+        - derby
+      categorical_columns:
+        - time_slot
+        - month
+        - season
+      target_variable: viewership
+      # features which are not needed for model training but useful to have when evaluating the model
+      explainer_columns:
+        - season
+        - match_date
+        - time_slot
+        - home_team
+        - away_team
+    xgboost_regression_model_params: &xgboost_viewership_base
+      <<: *xgboost_base
+      model_name: "xgboost_regression_predicted_viewership_model"
+      random_state: 28
+      train_n_sets: 3
+      bag_n_sets: 3
+      bag_n_splits: 3
+      xgboost_learning_rate:
+        - 0.01
+      xgboost_n_estimators:
+        - 800
+      xgboost_max_depth:
+        - 1
+      xgboost_min_child_weight:
+        - 5
+      numerical_columns:
+        - prospect_combined_team_rating
+        - prospect_combined_squad_rating
+        - prospect_team_rating_abs_difference
+        - match_jeopardy_title
+        - match_jeopardy_relegation
+        - viewership_linear_regression_predicted
+        - derby
+        - month_January
+        - month_February
+        - month_March
+        - month_April
+        - month_May
+        - month_August
+        - month_September
+        - month_October
+        - month_November
+        - month_December
+        - time_slot_Monday
+        - time_slot_Tuesday
+        - time_slot_Wednesday
+        - time_slot_Thursday 18:00
+        - time_slot_Thursday 21:00
+        - time_slot_Thursday Other
+        - time_slot_Friday 18:00
+        - time_slot_Friday 21:00
+        - time_slot_Friday Other
+        - time_slot_Saturday 18:00
+        - time_slot_Saturday 21:00
+        - time_slot_Saturday Other
+        - time_slot_Sunday
+        - "season_2023/2024"
+        - "season_2024/2025"
+      categorical_columns:
+      target_variable: viewership
+      # features which are not needed for model training but useful to have when evaluating the model
+      explainer_columns:
+        - season
+        - match_date
+        - time_slot
+        - home_team
+        - away_team
+        - train_id
+        - train_split
+        - train_type
+      stacked_columns:
+        - viewership_linear_regression_predicted
+  international_viewership:
+    linear_regression_model_params:
+      <<: *linear_viewership_base
+    xgboost_regression_model_params:
+      <<: *xgboost_viewership_base

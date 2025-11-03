@@ -1,0 +1,49 @@
+# This is a boilerplate parameters config generated for pipeline 'model_preprocessing'
+# using Kedro 1.0.0.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/1.0.0/configuration/parameters.html
+
+model_preprocessing:
+  # map team names from Prospect data source into raw data
+  team_name_mapping_dict:
+    {
+    "Al Feiha" : "Al Fayha",
+    "Al Orubah" : "Al Urooba",
+    "Al Qadisiyah" : "Al Qadsiah",
+    "Dhamk" : "Damac",
+    "Al Taawon": "Al Taawoun",
+    "Al Ta'ee": "Al Tai",
+    "Al Akhdoud": "Al Okhdoud",
+    }
+
+  # data taken from https://en.wikipedia.org/wiki/Category:Football_rivalries_in_Saudi_Arabia for Saudi Pro League derbies
+  team_derbies_dict:
+    {
+      "Al Hilal": "Al Nassr",
+      "Al Ahli": "Al Ittihad",
+      "Al Ittihad": "Al Hilal",
+    }
+
+  # dictionary for mapping match_ids from s3://psi-prod-data/football/elo_system/data/07_model_output/domestic/domestic_match_player_elo_stats_df.parquet to
+  # simulation match_ids s3://psi-dev-data/football/simulator_dashboard/simulated_match_jeopardy/orange.csv/
+  # most likely a bug as match_ids should be pulling from the same source and only effected 5 matches
+  team_elo_to_simulations_match_id_mapper:
+    {
+      5494526: 5494677, # Al Ittihad vs Al Feiha 2023/2024
+      5494527: 5494680, # Al Akhdoud vs Al Raed 2023/2024
+      5494530: 5494681, # Al Ettifaq vs Al Ahli 2023/2024
+      5494589: 5494741, # Al Hazem vs Al Riyadh 2023/2024
+      5494593: 5494745, # Al Taawon vs Al Shabab 2023/2024
+    }
+
+  # maps viewership data team names provided by Nelson to team names used by Wyscout
+viewership_team_name_mapping_dict:
+  {
+    "Al Hazm": "Al Hazem",
+    "Al Khaleej  of Saihat": "Al Khaleej",
+    "Al Okhdood": "Al Okhdoud",
+    "Al Orobah": "Al Urooba",
+    "Al Ta'ee Ha'il": "Al Tai",
+    "Al Taawun": "Al Taawoun",
+  }

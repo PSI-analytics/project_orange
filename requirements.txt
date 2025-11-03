@@ -1,0 +1,10 @@
+ipython>=8.10
+jupyterlab>=3.0
+notebook
+kedro[jupyter]~=1.0.0
+kedro-datasets[pandas-csvdataset, pandas-exceldataset, pandas-parquetdataset, plotly-plotlydataset, plotly-jsondataset, matplotlib-matplotlibwriter]>=3.0
+kedro-viz>=6.7.0
+scikit-learn~=1.5.1
+seaborn~=0.12.1
+# prospect==0.1.8 # internal package for installation use command pip install git+https://github.com/PSI-analytics/prospect_package@0.1.8
+pandera==0.26.1

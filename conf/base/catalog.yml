@@ -1,0 +1,208 @@
+# Here you can define all your data sets by using simple YAML syntax.
+#
+# Documentation for this file format can be found in "The Data Catalog"
+# Link: https://docs.kedro.org/en/stable/data_catalog.html
+#
+# We support interacting with a variety of data stores including local file systems, cloud, network and HDFS
+#
+# An example data set definition can look as follows:
+#
+#bikes:
+#  type: pandas.CSVDataset
+#  filepath: "s3://psi-dev-data/project_orange/kedro_data/data/01_raw/bikes.csv"
+#
+#weather:
+#  type: spark.SparkDataset
+#  filepath: s3a://your_bucket/01_raw/weather*
+#  file_format: csv
+#  credentials: dev_s3
+#  load_args:
+#    header: True
+#    inferSchema: True
+#  save_args:
+#    sep: '|'
+#    header: True
+#
+#scooters:
+#  type: pandas.SQLTableDataset
+#  credentials: scooters_credentials
+#  table_name: scooters
+#  load_args:
+#    index_col: ['name']
+#    columns: ['name', 'gear']
+#  save_args:
+#    if_exists: 'replace'
+#    # if_exists: 'fail'
+#    # if_exists: 'append'
+#
+# The Data Catalog supports being able to reference the same file using two different Dataset implementations
+# (transcoding), templating and a way to reuse arguments that are frequently repeated. See more here:
+# https://docs.kedro.org/en/stable/data_catalog.html
+# raw data provided by the client
+raw_attendance_data:
+  type: pandas.ExcelDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/01_raw/Attednance raw data.xlsx
+  load_args:
+    sheet_name: "New Master"
+
+raw_viewership_data_sheet_1:
+  type: pandas.ExcelDataset
+  filepath: "s3://psi-dev-data/project_orange/kedro_data/01_raw/2024.07.04 RSL data - per matchday - October 2025.xlsx"
+  load_args:
+    sheet_name: "Audiences - SPL - 2024-2025"
+
+raw_viewership_data_sheet_2:
+  type: pandas.ExcelDataset
+  filepath: "s3://psi-dev-data/project_orange/kedro_data/01_raw/2024.07.04 RSL data - per matchday - October 2025.xlsx"
+  load_args:
+    sheet_name: "Audiences -SPL- 2023-2024 "
+
+# prospect performance data copied from PROD s3://psi-prod-data/football/elo_system/07_model_output/domestic/domestic_match_player_elo_stats_df.parquet
+player_elo_df:
+  type: pandas.ParquetDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/01_raw/domestic_match_player_elo_stats_df.parquet
+
+prospect_raw_jeopardy_df:
+  type: src.project_orange.datasets.athena_dataset.AthenaQueryDataset
+  s3_staging_dir: "s3://psi-dev-data/Athena_Output/"
+  aws_region: "eu-west-2"
+  database: "football"
+  sql: "
+    SELECT
+    *
+  FROM
+    simulated_match_jeopardy
+  WHERE competition_name = 'Pro League'
+  "
+
+latest_team_ratings_df:
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/03_primary/latest_team_ratings_df.csv
+
+attendance_model_df:
+  type: pandas.ParquetDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/attendance/model_input_new.parquet
+
+domestic_viewership_model_df:
+  type: pandas.ParquetDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/domestic_viewership/model_input.parquet
+
+international_viewership_model_df:
+  type: pandas.ParquetDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/international_viewership/model_input.parquet
+
+"{namespace}.{variant}.model_df":
+  type: pandas.ParquetDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/{variant}/model_input.parquet
+
+# linear model
+# model artifacts
+"{namespace}.{variant}.linear_regression_model":
+  type: pickle.PickleDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/06_models/{variant}/{variant}_linear_regression_model.pkl
+
+"{namespace}.{variant}.linear_regression_model_scaler":
+  type: pickle.PickleDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/06_models/{variant}/{variant}_linear_regression_model_scaler.pkl
+
+# model training files
+"{namespace}.{variant}.linear_regression_model_predictions_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_linear_regression_model_predictions_df.csv
+
+"{namespace}.{variant}.linear_regression_model_coefficients_summary_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_linear_regression_model_coefficients_summary_df.csv
+
+"{namespace}.{variant}.linear_regression_model_metrics_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_linear_regression_model_metrics_df.csv
+
+"{namespace}.{variant}.linear_regression_xgboost_model_feature_importance":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/model_outputs/{variant}/{variant}_linear_regression_xgboost_model_feature_importance.jpeg
+
+# model graphics
+"{namespace}.{variant}.linear_regression_scatter_plot_of_model_vs_actual_train":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_linear_regression_scatter_plot_of_model_vs_actual_train.jpeg
+
+"{namespace}.{variant}.linear_regression_scatter_plot_of_attendance_vs_predicted_attendance":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_linear_regression_scatter_plot_of_attendance_vs_predicted_attendance.jpeg
+
+"{namespace}.{variant}.linear_regression_rolling_average_plot":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_linear_regression_rolling_average_plot.jpeg
+
+# model artifacts
+"{namespace}.{variant}.xgboost_regression_model":
+  type: pickle.PickleDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/06_models/{variant}/{variant}_xgboost_regression_model.pkl
+
+"{namespace}.{variant}.xgboost_regression_model_scaler":
+  type: pickle.PickleDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/06_models/{variant}/{variant}_xgboost_regression_model_scaler.pkl
+
+# xgboost model
+# model training files
+"{namespace}.{variant}.xgboost_regression_model_predictions_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_model_predictions_df.csv
+
+"{namespace}.{variant}.xgboost_regression_model_coefficients_summary_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_model_coefficients_summary_df.csv
+
+"{namespace}.{variant}.xgboost_regression_model_metrics_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_model_metrics_df.csv
+
+"{namespace}.{variant}.xgboost_regression_xgboost_model_feature_importance":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_xgboost_model_feature_importance.jpeg
+
+"{namespace}.{variant}.all_regression_model_ensemble_predictions_df":
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_all_regression_model_ensemble_predictions_df.csv
+
+# model graphics
+"{namespace}.{variant}.xgboost_regression_scatter_plot_of_model_vs_actual_train":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_scatter_plot_of_model_vs_actual_train.jpeg
+
+"{namespace}.{variant}.xgboost_regression_scatter_plot_of_attendance_vs_predicted_attendance":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_scatter_plot_of_attendance_vs_predicted_attendance.jpeg
+
+"{namespace}.{variant}.xgboost_regression_rolling_average_plot":
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/07_model_output/{variant}/{variant}_xgboost_regression_rolling_average_plot.jpeg
+
+model_predictions_for_commercial_scenario:
+  type: pandas.ExcelDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/all_model_predictions_for_2024_2025_season_commercial_scenarios.xlsx
+
+squad_rating_vs_team_rating_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/scenario_assumptions/squad_rating_vs_team_rating.jpeg
+
+jeopardy_heatmap_data:
+  type: pandas.ExcelDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/scenario_assumptions/jeopardy_heatmap_data.xlsx
+  load_args:
+    sheet_name: [Sheet1, Sheet2, Sheet3]
+
+jeopardy_heatmap_relegation_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/scenario_assumptions/jeopardy_heatmap_relegation.png
+
+jeopardy_heatmap_title_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/scenario_assumptions/jeopardy_heatmap_title.png
+
+jeopardy_heatmap_playoff_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/scenario_assumptions/jeopardy_heatmap_playoff.png
+
+
