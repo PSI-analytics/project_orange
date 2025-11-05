@@ -313,6 +313,8 @@ def _add_playoff_fixtures(
 
     playoff_df = _add_combined_ratings(playoff_df)
 
+    playoff_df["total_match_jeopardy"] = 0
+
     # Concatenate original with playoff fixtures
     df_extended = pd.concat([df, playoff_df], ignore_index=True)
 
@@ -378,16 +380,21 @@ def _create_jeopardy_scenarios(
 
     # Baseline scenario: return original data unchanged
     baseline_df = model_df.copy()
+    baseline_df["total_match_jeopardy"] = baseline_df["match_jeopardy_relegation"] + baseline_df["match_jeopardy_title"]
 
     # Scenario 1: Remove relegation jeopardy
     scenario_1_df = model_df.copy()
     scenario_1_df["match_jeopardy_relegation"] = 0
+    scenario_1_df["total_match_jeopardy"] = scenario_1_df["match_jeopardy_relegation"] + scenario_1_df["match_jeopardy_title"]
 
     # Scenario 2: Replace title jeopardy with scaled playoff jeopardy
     scenario_2_df = model_df.copy()
     scenario_2_df["match_jeopardy_title"] = (
         scenario_2_df["match_jeopardy_play_offs"] * playoff_impact_factor
     )
+    scenario_2_df["total_match_jeopardy"] = scenario_2_df["match_jeopardy_relegation"] + scenario_2_df[
+        "match_jeopardy_play_offs"]
+
     scenario_2_df = _add_playoff_fixtures(
         scenario_2_df,
         commercial_simulations_params["number_of_playoff_fixtures"],
@@ -400,6 +407,9 @@ def _create_jeopardy_scenarios(
     scenario_3_df["match_jeopardy_title"] = (
         scenario_3_df["match_jeopardy_play_offs"] * playoff_impact_factor
     )
+    scenario_3_df["total_match_jeopardy"] = scenario_3_df["match_jeopardy_relegation"] + scenario_3_df[
+        "match_jeopardy_play_offs"]
+
     scenario_3_df = _add_playoff_fixtures(
         scenario_3_df,
         commercial_simulations_params["number_of_playoff_fixtures"],
@@ -715,6 +725,12 @@ def run_commercial_scenarios(
                 for k in international_preds
             ],
             "Number of Matches": [len(attendance_preds[k]) for k in attendance_preds],
+            "Total In Season Jeopardy": [
+                attendance_preds[k]["total_match_jeopardy"]
+                .sum()
+                .astype(float)
+                for k in attendance_preds
+            ],
         }
     )
 

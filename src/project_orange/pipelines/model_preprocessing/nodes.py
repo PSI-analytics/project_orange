@@ -1018,12 +1018,16 @@ def create_model_df(
 
     clean_jeopardy_df = _get_latest_leverage_simulations(
         prospect_jeopardy_df[prospect_jeopardy_df["season"] != "2025/2026"],
-        ["top_1", "top_8", "bottom_2", "bottom_3"],
+        ["top_1", "top_2", "top_4", "top_8", "bottom_2", "bottom_3"],
     )
 
-    clean_jeopardy_df["match_jeopardy_play_offs"] = clean_jeopardy_df[
+    clean_jeopardy_df["match_jeopardy_play_offs"] = (clean_jeopardy_df[
+        "match_jeopardy_top_2"
+    ] + clean_jeopardy_df[
+        "match_jeopardy_top_4"
+    ] + clean_jeopardy_df[
         "match_jeopardy_top_8"
-    ].fillna(0)
+    ]).fillna(0)
 
     clean_jeopardy_df["match_jeopardy_relegation"] = clean_jeopardy_df[
         "match_jeopardy_bottom_2"
@@ -1260,7 +1264,7 @@ def heatmap_of_jeopardy_over_time(
         >>> title_df, title_fig = results["title"]
     """
     if jeopardy_types is None:
-        jeopardy_types = ["top_1", "top_8", "bottom_3"]
+        jeopardy_types = ["top_1", "top_2", "top_4", "top_8", "bottom_3"]
 
     # Filter and clean the data
     clean_jeopardy_df = _get_latest_leverage_simulations(
@@ -1268,12 +1272,19 @@ def heatmap_of_jeopardy_over_time(
         jeopardy_types,
     )
 
+    clean_jeopardy_df["match_jeopardy_playoff"] = (clean_jeopardy_df[
+        "match_jeopardy_top_2"
+    ] + clean_jeopardy_df[
+        "match_jeopardy_top_4"
+    ] + clean_jeopardy_df[
+        "match_jeopardy_top_8"
+    ]).fillna(0)
+
     # Rename columns for clarity
     clean_jeopardy_df = clean_jeopardy_df.rename(
         columns={
             "match_jeopardy_top_1": "match_jeopardy_title",
             "match_jeopardy_bottom_3": "match_jeopardy_relegation",
-            "match_jeopardy_top_8": "match_jeopardy_playoff",
         }
     )
 

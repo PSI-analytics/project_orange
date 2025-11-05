@@ -4,6 +4,7 @@ import pandas as pd
 import pandera as pa
 from pandera import extensions
 from pandera.typing import Series
+from typing import Optional
 
 
 class attendance_model_schema(pa.DataFrameModel):
@@ -64,6 +65,7 @@ class attendance_model_schema(pa.DataFrameModel):
     match_jeopardy_title: Series[float] = pa.Field(ge=0, le=1, coerce=True)
     match_jeopardy_relegation: Series[float] = pa.Field(ge=0, le=1, coerce=True)
     match_jeopardy_play_offs: Series[float] = pa.Field(ge=0, le=1, coerce=True)
+    total_match_jeopardy: Optional[Series[float]] = pa.Field(ge=0, le=2, coerce=True)
     attendance: Series[int] = pa.Field(coerce=True)
     venue_percentage_capacity: Series[float] = pa.Field(coerce=True)
 
@@ -130,6 +132,7 @@ class viewership_model_schema(pa.DataFrameModel):
     match_jeopardy_title: Series[float] = pa.Field(ge=0, le=1, coerce=True)
     match_jeopardy_relegation: Series[float] = pa.Field(ge=0, le=1, coerce=True)
     match_jeopardy_play_offs: Series[float] = pa.Field(ge=0, le=1, coerce=True)
+    total_match_jeopardy: Optional[Series[float]] = pa.Field(ge=0, le=2, coerce=True)
     viewership: Series[int] = pa.Field(ge=0, coerce=True)
 
     # will filter the given dataframe to only contain the columns specified above
