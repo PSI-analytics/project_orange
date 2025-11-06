@@ -18,6 +18,7 @@ from ..model_generation.nodes import (
 )
 from ..model_preprocessing.nodes import (
     _validate_with_schema,
+    _impute_below_season_threshold,
 )
 
 
@@ -180,75 +181,6 @@ def _make_stacked_model_prediction(
     return validated_attendance_model_df
 
 
-def _impute_below_season_threshold(
-    df: pd.DataFrame,
-    target_cols: list,
-    season_col="season",
-    method="mean",
-    club_name_list=None,
-):
-    """
-    Impute values in specified columns that fall below a season-level threshold.
-
-    This function computes an aggregate threshold (mean or top quartile) for each season
-    based on the specified target columns. Any value in those columns that is below the
-    calculated threshold will be replaced with the threshold value.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame containing season and target columns.
-        season_col (str): Name of the column representing the season.
-        target_cols (list[str]): List of column names to evaluate and impute.
-        method (str, optional): Aggregation method for computing the threshold.
-            Options are:
-            - "mean": Use the mean value per season.
-            - "top_quartile": Use the 75th percentile per season.
-            Defaults to "mean".
-
-    Returns:
-        pd.DataFrame: A new DataFrame with imputed values where applicable.
-
-    Raises:
-        ValueError: If an unsupported method is provided.
-    """
-    df = df.copy()
-
-    for variable in target_cols:
-        # Compute aggregation per season
-        if method == "mean":
-            season_threshold = df.groupby(season_col)[variable].mean()
-        elif method == "top_quartile":
-            season_threshold = df.groupby(season_col)[variable].quantile(0.75)
-        elif method == "club":
-            if "home" in variable:
-                filtered_df = df[df["home_team"].isin(club_name_list)].reset_index(
-                    drop=True
-                )
-            elif "away" in variable:
-                filtered_df = df[df["away_team"].isin(club_name_list)].reset_index(
-                    drop=True
-                )
-            else:
-                raise ValueError(f"{variable} is not supported for club imputation")
-            season_threshold = filtered_df.groupby(season_col)[variable].mean()
-        else:
-            raise ValueError("method must be 'mean', 'top_quartile' or 'club'")
-
-        season_threshold = season_threshold.reset_index(
-            name=f"{variable}_season_threshold"
-        )
-
-        # Merge back into original df
-        df = df.merge(season_threshold, on=season_col, how="left")
-
-        df[variable] = df.apply(
-            lambda row: max(row[variable], row[f"{variable}_season_threshold"]), axis=1
-        )
-
-        # Remove helper column
-        df = df.drop(columns=[f"{variable}_season_threshold"])
-    return df
-
-
 def _add_playoff_fixtures(
     df: pd.DataFrame,
     n_fixtures: int = 7,
@@ -380,20 +312,27 @@ def _create_jeopardy_scenarios(
 
     # Baseline scenario: return original data unchanged
     baseline_df = model_df.copy()
-    baseline_df["total_match_jeopardy"] = baseline_df["match_jeopardy_relegation"] + baseline_df["match_jeopardy_title"]
+    baseline_df["total_match_jeopardy"] = (
+        baseline_df["match_jeopardy_relegation"] + baseline_df["match_jeopardy_title"]
+    )
 
     # Scenario 1: Remove relegation jeopardy
     scenario_1_df = model_df.copy()
     scenario_1_df["match_jeopardy_relegation"] = 0
-    scenario_1_df["total_match_jeopardy"] = scenario_1_df["match_jeopardy_relegation"] + scenario_1_df["match_jeopardy_title"]
+    scenario_1_df["total_match_jeopardy"] = (
+        scenario_1_df["match_jeopardy_relegation"]
+        + scenario_1_df["match_jeopardy_title"]
+    )
 
     # Scenario 2: Replace title jeopardy with scaled playoff jeopardy
     scenario_2_df = model_df.copy()
     scenario_2_df["match_jeopardy_title"] = (
         scenario_2_df["match_jeopardy_play_offs"] * playoff_impact_factor
     )
-    scenario_2_df["total_match_jeopardy"] = scenario_2_df["match_jeopardy_relegation"] + scenario_2_df[
-        "match_jeopardy_play_offs"]
+    scenario_2_df["total_match_jeopardy"] = (
+        scenario_2_df["match_jeopardy_relegation"]
+        + scenario_2_df["match_jeopardy_play_offs"]
+    )
 
     scenario_2_df = _add_playoff_fixtures(
         scenario_2_df,
@@ -407,8 +346,10 @@ def _create_jeopardy_scenarios(
     scenario_3_df["match_jeopardy_title"] = (
         scenario_3_df["match_jeopardy_play_offs"] * playoff_impact_factor
     )
-    scenario_3_df["total_match_jeopardy"] = scenario_3_df["match_jeopardy_relegation"] + scenario_3_df[
-        "match_jeopardy_play_offs"]
+    scenario_3_df["total_match_jeopardy"] = (
+        scenario_3_df["match_jeopardy_relegation"]
+        + scenario_3_df["match_jeopardy_play_offs"]
+    )
 
     scenario_3_df = _add_playoff_fixtures(
         scenario_3_df,
@@ -726,9 +667,7 @@ def run_commercial_scenarios(
             ],
             "Number of Matches": [len(attendance_preds[k]) for k in attendance_preds],
             "Total In Season Jeopardy": [
-                attendance_preds[k]["total_match_jeopardy"]
-                .sum()
-                .astype(float)
+                attendance_preds[k]["total_match_jeopardy"].sum().astype(float)
                 for k in attendance_preds
             ],
         }

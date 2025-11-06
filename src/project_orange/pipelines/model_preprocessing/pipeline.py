@@ -10,6 +10,7 @@ from .nodes import (
     create_viewership_model_df,
     scatter_plot_of_team_rating_vs_squad_rating,
     heatmap_of_jeopardy_over_time,
+    create_simulation_team_dictionaries,
 )
 
 
@@ -35,6 +36,15 @@ def create_pipeline(**kwargs) -> Pipeline:
                 inputs="attendance_model_df",
                 outputs="squad_rating_vs_team_rating_plot",
                 name="scatter_plot_of_team_rating_vs_squad_rating_node",
+            ),
+            node(
+                func=create_simulation_team_dictionaries,
+                inputs="player_elo_df",
+                outputs=[
+                    "team_dictionary_commercial_scenario_1",
+                    "team_dictionary_commercial_scenario_2",
+                ],
+                name="create_simulation_team_dictionaries_node",
             ),
             node(
                 func=heatmap_of_jeopardy_over_time,

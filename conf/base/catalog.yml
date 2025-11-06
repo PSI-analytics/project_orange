@@ -205,4 +205,12 @@ jeopardy_heatmap_playoff_plot:
   type: matplotlib.MatplotlibWriter
   filepath: s3://psi-dev-data/project_orange/kedro_data/08_reporting/project_orange/scenario_assumptions/jeopardy_heatmap_playoff.png
 
+team_dictionary_commercial_scenario_1:
+  type: pickle.PickleDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/simulations/team_dictionary_commercial_scenario_1.pkl
+
+team_dictionary_commercial_scenario_2:
+  type: pickle.PickleDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/attendance/team_dictionary_commercial_scenario_2.pkl
+
 

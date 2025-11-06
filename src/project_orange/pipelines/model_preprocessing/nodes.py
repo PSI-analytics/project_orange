@@ -5,6 +5,7 @@ generated using Kedro 1.0.0
 
 import logging
 from typing import Optional, Union, List
+import json
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1021,13 +1022,11 @@ def create_model_df(
         ["top_1", "top_2", "top_4", "top_8", "bottom_2", "bottom_3"],
     )
 
-    clean_jeopardy_df["match_jeopardy_play_offs"] = (clean_jeopardy_df[
-        "match_jeopardy_top_2"
-    ] + clean_jeopardy_df[
-        "match_jeopardy_top_4"
-    ] + clean_jeopardy_df[
-        "match_jeopardy_top_8"
-    ]).fillna(0)
+    clean_jeopardy_df["match_jeopardy_play_offs"] = (
+        clean_jeopardy_df["match_jeopardy_top_2"]
+        + clean_jeopardy_df["match_jeopardy_top_4"]
+        + clean_jeopardy_df["match_jeopardy_top_8"]
+    ).fillna(0)
 
     clean_jeopardy_df["match_jeopardy_relegation"] = clean_jeopardy_df[
         "match_jeopardy_bottom_2"
@@ -1272,13 +1271,11 @@ def heatmap_of_jeopardy_over_time(
         jeopardy_types,
     )
 
-    clean_jeopardy_df["match_jeopardy_playoff"] = (clean_jeopardy_df[
-        "match_jeopardy_top_2"
-    ] + clean_jeopardy_df[
-        "match_jeopardy_top_4"
-    ] + clean_jeopardy_df[
-        "match_jeopardy_top_8"
-    ]).fillna(0)
+    clean_jeopardy_df["match_jeopardy_playoff"] = (
+        clean_jeopardy_df["match_jeopardy_top_2"]
+        + clean_jeopardy_df["match_jeopardy_top_4"]
+        + clean_jeopardy_df["match_jeopardy_top_8"]
+    ).fillna(0)
 
     # Rename columns for clarity
     clean_jeopardy_df = clean_jeopardy_df.rename(
@@ -1311,3 +1308,151 @@ def heatmap_of_jeopardy_over_time(
 
     # Return dictionary and plots
     return dataframes_dict, plots[0], plots[1], plots[2]
+
+
+def _impute_below_season_threshold(
+    df: pd.DataFrame,
+    target_cols: list,
+    season_col="season",
+    method="mean",
+    club_name_list=None,
+):
+    """
+    Impute values in specified columns that fall below a season-level threshold.
+
+    This function computes an aggregate threshold (mean or top quartile) for each season
+    based on the specified target columns. Any value in those columns that is below the
+    calculated threshold will be replaced with the threshold value.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing season and target columns.
+        season_col (str): Name of the column representing the season.
+        target_cols (list[str]): List of column names to evaluate and impute.
+        method (str, optional): Aggregation method for computing the threshold.
+            Options are:
+            - "mean": Use the mean value per season.
+            - "top_quartile": Use the 75th percentile per season.
+            Defaults to "mean".
+
+    Returns:
+        pd.DataFrame: A new DataFrame with imputed values where applicable.
+
+    Raises:
+        ValueError: If an unsupported method is provided.
+    """
+    df = df.copy()
+
+    for variable in target_cols:
+        # Compute aggregation per season
+        if method == "mean":
+            season_threshold = df.groupby(season_col)[variable].mean()
+        elif method == "top_quartile":
+            season_threshold = df.groupby(season_col)[variable].quantile(0.75)
+        elif method == "club":
+            if "home" in variable:
+                filtered_df = df[df["home_team"].isin(club_name_list)].reset_index(
+                    drop=True
+                )
+            elif "away" in variable:
+                filtered_df = df[df["away_team"].isin(club_name_list)].reset_index(
+                    drop=True
+                )
+            elif "team_pre_match_rating" in variable:
+                filtered_df = df[df["team_name"].isin(club_name_list)].reset_index(
+                    drop=True
+                )
+            else:
+                raise ValueError(f"{variable} is not supported for club imputation")
+            season_threshold = filtered_df.groupby(season_col)[variable].mean()
+        else:
+            raise ValueError("method must be 'mean', 'top_quartile' or 'club'")
+
+        season_threshold = season_threshold.reset_index(
+            name=f"{variable}_season_threshold"
+        )
+
+        # Merge back into original df
+        df = df.merge(season_threshold, on=season_col, how="left")
+
+        df[variable] = df.apply(
+            lambda row: max(row[variable], row[f"{variable}_season_threshold"]), axis=1
+        )
+
+        # Remove helper column
+        df = df.drop(columns=[f"{variable}_season_threshold"])
+    return df
+
+
+def create_simulation_team_dictionaries(player_elo_df: pd.DataFrame):
+    """Generate team average pre-match rating dictionaries for different scenarios.
+
+    This function filters the input DataFrame for rows where ``season_name`` equals
+    "2024/2025". It then computes average team pre-match ratings for two scenarios:
+    1. A general average across all teams.
+    2. An uplift scenario emphasizing top-performing clubs (e.g., Al Hilal, Al Nassr).
+
+    Args:
+        player_elo_df (pd.DataFrame): The input DataFrame containing match-level data
+            with at least the columns ``season_name``, ``team_name``, and
+            ``team_pre_match_rating``.
+
+    Returns:
+        tuple[dict, dict]: A tuple of two dictionaries:
+            - Scenario 1: {team_name: avg_team_pre_match_rating}
+            - Scenario 2: {team_name: avg_team_pre_match_rating (after uplift)}
+
+    Example:
+        >>> scenario_1, scenario_2 = create_simulation_team_dictionaries(df)
+        >>> print(scenario_1)
+        {'Al Hilal': 72.45, 'Al Feiha': 51.13, ...}
+    """
+    # Filter for the target season
+    season_df = player_elo_df[player_elo_df["season_name"] == "2024/2025"]
+
+    if season_df.empty:
+        print("No data available for season 2024/2025.")
+        return {}, {}
+
+    # Impute below-season threshold ratings
+    average_season_df = _impute_below_season_threshold(
+        season_df,
+        ["team_pre_match_rating"],
+        season_col="season_name",
+    )
+
+    # Top teams uplift scenario
+    uplift_top_teams_df = _impute_below_season_threshold(
+        season_df,
+        ["team_pre_match_rating"],
+        season_col="season_name",
+        method="club",
+        club_name_list=["Al Hilal", "Al Nassr"],
+    )
+
+    # Scenario 1: Average ratings
+    commercial_scenario_1_dict = (
+        average_season_df.groupby("team_name")["team_pre_match_rating"].mean().to_dict()
+    )
+
+    print("Commercial Scenario 1 - Average Team Uplift")
+    print(json.dumps(commercial_scenario_1_dict, indent=4))
+
+    # Scenario 2: Uplifted ratings
+    commercial_scenario_2_dict = (
+        uplift_top_teams_df.groupby("team_name")["team_pre_match_rating"]
+        .mean()
+        .to_dict()
+    )
+
+    # Safely copy Al Ahli rating to Al Hilal if exists
+    if "Al Ahli" in commercial_scenario_2_dict:
+        commercial_scenario_2_dict["Al Hilal"] = commercial_scenario_2_dict["Al Ahli"]
+    else:
+        print(
+            "⚠️ 'Al Ahli' not found in uplift data; skipping reassignment to 'Al Hilal'."
+        )
+
+    print("Commercial Scenario 2 - Top 2 Teams Uplift")
+    print(json.dumps(commercial_scenario_2_dict, indent=4))
+
+    return commercial_scenario_1_dict, commercial_scenario_2_dict
