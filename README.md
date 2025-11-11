@@ -4,9 +4,29 @@
 
 ## Overview
 
-This is your new Kedro project, which was generated using `kedro 1.0.0`.
+The purpose of this project is to deliver a scope of work for the Saudi Pro League. This was done together with PwC
+where Prospect was looking at the impact of attendance and viewership and the impact of moving to a closed league.
 
-Take a look at the [Kedro documentation](https://docs.kedro.org) to get started.
+This project has been split into the following pipelines:
+* model_generation: Training of a predicted attendance and viewership model
+* model_prediction: Using both models to make predictions for various commercial scenarios
+* model_preprocessing: Cleaning and feature engineering of the dataset
+
+Any questions about the project get in touch with Zubin (zr@prospectsportinginsights.co.uk).
+
+Project should be run using `python 3.10`
+
+To create environment to run the project use the following commands:
+
+```
+pip install -r requirements.txt
+```
+The project uses the Prospect package which is not publicly available so to install the Prospect package use the below
+command
+
+```
+pip install git+https://github.com/PSI-analytics/prospect_package@0.1.8
+```
 
 ## Rules and guidelines
 
