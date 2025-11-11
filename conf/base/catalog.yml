@@ -73,6 +73,7 @@ prospect_raw_jeopardy_df:
   FROM
     simulated_match_jeopardy
   WHERE competition_name = 'Pro League'
+  AND pipeline_run_date != '2025-11-10'
   "
 
 latest_team_ratings_df:
@@ -213,4 +214,32 @@ team_dictionary_commercial_scenario_2:
   type: pickle.PickleDataset
   filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/attendance/team_dictionary_commercial_scenario_2.pkl
 
+future_jeopardy_base_case_df:
+  type: src.project_orange.datasets.athena_dataset.AthenaQueryDataset
+  s3_staging_dir: "s3://psi-dev-data/Athena_Output/"
+  aws_region: "eu-west-2"
+  database: "football"
+  sql: "
+    SELECT
+    *
+  FROM
+    simulated_match_jeopardy
+  WHERE competition_name = 'Pro League'
+  AND simulate_from_date = '2024/08/22'
+  AND pipeline_run_date != '2025-11-10'
+  "
+
+# uplift_to_average_squad
+future_jeopardy_df_commercial_scenario_1:
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/football/simulator_dashboard/simulated_match_jeopardy/orange.csv/2025-11-10T17.32.01.578Z/orange.csv
+
+# uplift_to_top_teams
+future_jeopardy_df_commercial_scenario_2:
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/football/simulator_dashboard/simulated_match_jeopardy/orange.csv/2025-11-10T17.02.23.617Z/orange.csv
+
+all_future_jeopardy_df:
+  type: pandas.CSVDataset
+  filepath: s3://psi-dev-data/project_orange/kedro_data/05_model_input/all_future_jeopardy_df.csv
 

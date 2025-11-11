@@ -3,8 +3,8 @@ This is a boilerplate pipeline 'model_predictions'
 generated using Kedro 1.0.0
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from prospect.models.predictions import (
     create_model_ensemble_predictions_df,
 )
@@ -19,6 +19,8 @@ from ..model_generation.nodes import (
 from ..model_preprocessing.nodes import (
     _validate_with_schema,
     _impute_below_season_threshold,
+    _get_latest_leverage_simulations,
+    _process_jeopardy_dataframe,
 )
 
 
@@ -245,7 +247,7 @@ def _add_playoff_fixtures(
 
     playoff_df = _add_combined_ratings(playoff_df)
 
-    playoff_df["total_match_jeopardy"] = 0
+    playoff_df["total_match_jeopardy"] = 1
 
     # Concatenate original with playoff fixtures
     df_extended = pd.concat([df, playoff_df], ignore_index=True)
@@ -255,6 +257,7 @@ def _add_playoff_fixtures(
 
 def _create_jeopardy_scenarios(
     model_df: pd.DataFrame,
+    jeopardy_df: pd.DataFrame,
     commercial_simulations_params: dict,
     playoff_impact_factor: float = 1.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -310,6 +313,46 @@ def _create_jeopardy_scenarios(
     if missing_columns:
         raise KeyError(f"Missing required columns: {missing_columns}")
 
+    model_df = model_df.drop(
+        columns=[
+            "match_jeopardy_relegation",
+            "match_jeopardy_title",
+            "match_jeopardy_play_offs",
+        ]
+    )
+
+    # replace with future jeopardy from the simulators
+    model_df = model_df.merge(
+        jeopardy_df[
+            [
+                "season",
+                "home_team",
+                "away_team",
+                "match_jeopardy_relegation",
+                "match_jeopardy_title",
+                "match_jeopardy_play_offs",
+            ]
+        ],
+        on=["season", "home_team", "away_team"],
+        how="left",
+    )
+
+    # fill na with 0 for missing seasons. Keep previous seasons as logic for one hot encoding when making model predictions
+    # requires it
+    model_df[
+        [
+            "match_jeopardy_relegation",
+            "match_jeopardy_title",
+            "match_jeopardy_play_offs",
+        ]
+    ] = model_df[
+        [
+            "match_jeopardy_relegation",
+            "match_jeopardy_title",
+            "match_jeopardy_play_offs",
+        ]
+    ].fillna(0)
+
     # Baseline scenario: return original data unchanged
     baseline_df = model_df.copy()
     baseline_df["total_match_jeopardy"] = (
@@ -362,6 +405,7 @@ def _create_jeopardy_scenarios(
 
 def _run_model_scenarios(
     model_df: pd.DataFrame,
+    future_jeopardy_df: pd.DataFrame,
     linear_model: dict,
     linear_scaler,
     linear_params: dict,
@@ -437,7 +481,12 @@ def _run_model_scenarios(
     jeopardy_scenarios = {}
     for uplift_name, uplift_df in uplift_scenarios.items():
         jeopardy_dfs = _create_jeopardy_scenarios(
-            uplift_df, commercial_simulations_params, 0.5
+            uplift_df,
+            future_jeopardy_df[
+                future_jeopardy_df["scenario"] == uplift_name
+            ].reset_index(drop=True),
+            commercial_simulations_params,
+            0.5,
         )
         for jeopardy_idx, jeopardy_df in enumerate(jeopardy_dfs, start=1):
             scenario_key = f"{uplift_name}_scenario_{jeopardy_idx}"
@@ -457,7 +506,18 @@ def _run_model_scenarios(
             schema,
         )
 
-    # Filter all scenarios to the target season
+        # split out regular season and play-offs
+        play_off_df = prediction_scenarios[scenario_name][
+            prediction_scenarios[scenario_name]["match_jeopardy_title"] == 1
+        ]
+
+        if len(play_off_df) > 0:
+            prediction_scenarios[scenario_name] = prediction_scenarios[scenario_name][
+                prediction_scenarios[scenario_name]["match_jeopardy_title"] != 1
+            ].reset_index(drop=True)
+            prediction_scenarios[scenario_name + "- playoffs"] = play_off_df
+
+            # Filter all scenarios to the target season
     filtered_scenarios = {
         key: df[df["season"] == season_filter]
         for key, df in prediction_scenarios.items()
@@ -501,8 +561,8 @@ def _create_uplift_scenarios(
 
     return {
         "status_quo": status_quo,
-        "uplift_average": uplift_average,
-        "uplift_top_teams": uplift_top_teams,
+        "uplift_to_average_squad": uplift_average,
+        "uplift_to_top_teams": uplift_top_teams,
     }
 
 
@@ -521,6 +581,9 @@ def _add_combined_ratings(df: pd.DataFrame) -> pd.DataFrame:
     df["prospect_combined_team_rating"] = (
         df["prospect_home_team_rating"] + df["prospect_away_team_rating"]
     )
+    df["prospect_team_rating_abs_difference"] = abs(
+        df["prospect_home_team_rating"] - df["prospect_away_team_rating"]
+    )
     return df
 
 
@@ -528,6 +591,7 @@ def run_commercial_scenarios(
     attendance_model_df: pd.DataFrame,
     domestic_viewership_model_df: pd.DataFrame,
     international_viewership_model_df: pd.DataFrame,
+    future_jeopardy_df: pd.DataFrame,
     predicted_attendance_linear_model: dict,
     predicted_attendance_linear_model_scaler,
     predicted_attendance_linear_model_params: dict,
@@ -547,6 +611,8 @@ def run_commercial_scenarios(
     predicted_international_viewership_xgboost_model_scaler,
     predicted_international_viewership_xgboost_model_params: dict,
     commercial_simulations_params: dict,
+    future_jeopardy_scenario_1_df: pd.DataFrame,
+    future_jeopardy_scenario_2_df: pd.DataFrame,
 ):
     """
     Runs commercial scenario predictions for attendance, domestic viewership,
@@ -594,6 +660,7 @@ def run_commercial_scenarios(
     # Run each scenario group
     attendance_preds = _run_model_scenarios(
         attendance_model_df,
+        future_jeopardy_df,
         predicted_attendance_linear_model,
         predicted_attendance_linear_model_scaler,
         predicted_attendance_linear_model_params,
@@ -606,6 +673,7 @@ def run_commercial_scenarios(
 
     domestic_preds = _run_model_scenarios(
         domestic_viewership_model_df,
+        future_jeopardy_df,
         predicted_domestic_viewership_linear_model,
         predicted_domestic_viewership_linear_model_scaler,
         predicted_domestic_viewership_linear_model_params,
@@ -618,6 +686,7 @@ def run_commercial_scenarios(
 
     international_preds = _run_model_scenarios(
         international_viewership_model_df,
+        future_jeopardy_df,
         predicted_international_viewership_linear_model,
         predicted_international_viewership_linear_model_scaler,
         predicted_international_viewership_linear_model_params,
@@ -632,16 +701,22 @@ def run_commercial_scenarios(
     scenario_labels = [
         "status quo",
         "status quo - no relegation",
-        "status quo - 8 team play-off",
-        "status quo - no relegation & 8 team play-off",
+        "status quo - 8 team play-off (regular season)",
+        "status quo - 8 team play-off (playoffs)",
+        "status quo - no relegation & 8 team play-off (regular season)",
+        "status quo - no relegation & 8 team play-off (playoffs)",
         "uplift to average squad",
         "uplift to average squad - no relegation",
-        "uplift to average squad - 8 team play-off",
-        "uplift to average squad - no relegation & 8 team play-off",
+        "uplift to average squad - 8 team play-off (regular season)",
+        "uplift to average squad - 8 team play-off (playoffs)",
+        "uplift to average squad - no relegation & 8 team play-off (regular season)",
+        "uplift to average squad - no relegation & 8 team play-off (playoffs)",
         "uplift to top teams",
         "uplift to top teams - no relegation",
-        "uplift to top teams - 8 team play-off",
-        "uplift to top teams - no relegation & 8 team play-off",
+        "uplift to top teams - 8 team play-off (regular season)",
+        "uplift to top teams - 8 team play-off (playoffs)",
+        "uplift to top teams - no relegation & 8 team play-off (regular season)",
+        "uplift to top teams - no relegation & 8 team play-off (playoffs)",
     ]
 
     overall_impact_df = pd.DataFrame(
@@ -674,3 +749,79 @@ def run_commercial_scenarios(
     )
 
     return overall_impact_df
+
+
+def process_future_jeopardy_data(
+    future_jeopardy_df_commercial_scenario_1: pd.DataFrame,
+    future_jeopardy_df_commercial_scenario_2: pd.DataFrame,
+    future_jeopardy_base_case_df: pd.DataFrame,
+    params: dict,
+) -> pd.DataFrame:
+    """Process future Jeopardy match data for multiple commercial scenarios.
+
+    This function cleans and processes three Jeopardy DataFrames: a base case and
+    two commercial scenarios. It applies leverage simulations, processes match
+    columns, adds a scenario label, and concatenates the results into a single DataFrame.
+
+    Args:
+        future_jeopardy_df_commercial_scenario_1 (pd.DataFrame):
+            DataFrame for commercial scenario 1 containing future Jeopardy match data.
+        future_jeopardy_df_commercial_scenario_2 (pd.DataFrame):
+            DataFrame for commercial scenario 2 containing future Jeopardy match data.
+        future_jeopardy_base_case_df (pd.DataFrame):
+            Base case DataFrame containing future Jeopardy match data.
+
+    Returns:
+        pd.DataFrame: A concatenated DataFrame containing processed Jeopardy match data
+        for the base case and both commercial scenarios, with a `scenario` column
+        indicating the source scenario.
+    """
+    leverage_columns = ["top_1", "top_2", "top_4", "top_8", "bottom_3"]
+
+    # Process base case
+    clean_jeopardy_base_case_df = _get_latest_leverage_simulations(
+        future_jeopardy_base_case_df, leverage_columns
+    )
+    clean_jeopardy_base_case_df = _process_jeopardy_dataframe(
+        clean_jeopardy_base_case_df, False
+    )
+    clean_jeopardy_base_case_df["scenario"] = "status_quo"
+
+    # Process commercial scenario 1
+    clean_jeopardy_scenario_1_df = _get_latest_leverage_simulations(
+        future_jeopardy_df_commercial_scenario_1, leverage_columns
+    )
+    clean_jeopardy_scenario_1_df = _process_jeopardy_dataframe(
+        clean_jeopardy_scenario_1_df, False
+    )
+    clean_jeopardy_scenario_1_df["scenario"] = "uplift_to_average_squad"
+
+    # Process commercial scenario 2
+    clean_jeopardy_scenario_2_df = _get_latest_leverage_simulations(
+        future_jeopardy_df_commercial_scenario_2, leverage_columns
+    )
+    clean_jeopardy_scenario_2_df = _process_jeopardy_dataframe(
+        clean_jeopardy_scenario_2_df, False
+    )
+    clean_jeopardy_scenario_2_df["scenario"] = "uplift_to_top_teams"
+
+    # Combine all processed DataFrames
+    all_future_jeopardy_df = pd.concat(
+        [
+            clean_jeopardy_base_case_df,
+            clean_jeopardy_scenario_1_df,
+            clean_jeopardy_scenario_2_df,
+        ],
+        ignore_index=True,
+    )
+
+    # map names to be useable by model dataframe
+    all_future_jeopardy_df["home_team"] = all_future_jeopardy_df[
+        "home_team_name"
+    ].replace(params["team_name_mapping_dict"])
+
+    all_future_jeopardy_df["away_team"] = all_future_jeopardy_df[
+        "away_team_name"
+    ].replace(params["team_name_mapping_dict"])
+
+    return all_future_jeopardy_df

@@ -973,6 +973,54 @@ def _plot_jeopardy_heatmap(heatmap_df, jeopardy_name, figsize=(14, 6), cmap="Gre
     return fig
 
 
+def _process_jeopardy_dataframe(
+    clean_jeopardy_df: pd.DataFrame,
+    multiple_seasons=True,
+) -> pd.DataFrame:
+    """Process the Jeopardy match DataFrame by computing playoff and relegation columns.
+
+    This function adds two new columns to the given DataFrame:
+      - `match_jeopardy_play_offs`: The sum of the top 2, top 4, and top 8 match columns.
+      - `match_jeopardy_relegation`: The sum of the bottom 2 and bottom 3 match columns.
+
+    It also renames the column `match_jeopardy_top_1` to `match_jeopardy_title`.
+
+    Missing values (NaN) in any of the relevant columns are treated as 0 during the computation.
+
+    Args:
+        clean_jeopardy_df (pd.DataFrame):
+            The input DataFrame containing Jeopardy match columns such as
+            'match_jeopardy_top_1', 'match_jeopardy_top_2', 'match_jeopardy_top_4',
+            'match_jeopardy_top_8', 'match_jeopardy_bottom_2', and 'match_jeopardy_bottom_3'.
+
+    Returns:
+        pd.DataFrame:
+            A modified DataFrame with new computed columns and the renamed title column.
+    """
+    clean_jeopardy_df["match_jeopardy_play_offs"] = (
+        clean_jeopardy_df["match_jeopardy_top_2"]
+        + clean_jeopardy_df["match_jeopardy_top_4"]
+        + clean_jeopardy_df["match_jeopardy_top_8"]
+    ).fillna(0)
+
+    if multiple_seasons:
+        clean_jeopardy_df["match_jeopardy_relegation"] = clean_jeopardy_df[
+            "match_jeopardy_bottom_2"
+        ].fillna(0) + clean_jeopardy_df["match_jeopardy_bottom_3"].fillna(0)
+        clean_jeopardy_df = clean_jeopardy_df.rename(
+            columns={"match_jeopardy_top_1": "match_jeopardy_title"}
+        )
+    else:
+        clean_jeopardy_df = clean_jeopardy_df.rename(
+            columns={
+                "match_jeopardy_top_1": "match_jeopardy_title",
+                "match_jeopardy_bottom_3": "match_jeopardy_relegation",
+            }
+        )
+
+    return clean_jeopardy_df
+
+
 def create_model_df(
     attendance_df: pd.DataFrame,
     player_elo_df: pd.DataFrame,
@@ -1022,21 +1070,7 @@ def create_model_df(
         ["top_1", "top_2", "top_4", "top_8", "bottom_2", "bottom_3"],
     )
 
-    clean_jeopardy_df["match_jeopardy_play_offs"] = (
-        clean_jeopardy_df["match_jeopardy_top_2"]
-        + clean_jeopardy_df["match_jeopardy_top_4"]
-        + clean_jeopardy_df["match_jeopardy_top_8"]
-    ).fillna(0)
-
-    clean_jeopardy_df["match_jeopardy_relegation"] = clean_jeopardy_df[
-        "match_jeopardy_bottom_2"
-    ].fillna(0) + clean_jeopardy_df["match_jeopardy_bottom_3"].fillna(0)
-
-    clean_jeopardy_df = clean_jeopardy_df.rename(
-        columns={
-            "match_jeopardy_top_1": "match_jeopardy_title",
-        }
-    )
+    clean_jeopardy_df = _process_jeopardy_dataframe(clean_jeopardy_df)
 
     prospect_performance_metrics_df = _create_single_prospect_df(
         clean_jeopardy_df,
